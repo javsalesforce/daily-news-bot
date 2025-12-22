@@ -1,0 +1,21 @@
+name: Run Salesforce Bot
+
+on:
+  schedule:
+    # This runs every 4 hours
+    - cron: '0 */4 * * *'
+  # Allows you to click "Run" manually to test
+  workflow_dispatch:
+
+jobs:
+  run-script:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      - run: pip install feedparser google-generativeai
+      - env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python daily_digest.py
