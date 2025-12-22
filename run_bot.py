@@ -1,12 +1,12 @@
 import feedparser
 import google.generativeai as genai
 import os
-import requests # <--- New tool to talk to GitHub
+import requests
 
 # 1. SETUP: Keys & Tokens
 API_KEY = os.environ.get("GEMINI_API_KEY")
-GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN") # <--- New Key (Built-in)
-REPO_NAME = os.environ.get("GITHUB_REPOSITORY") # <--- Gets "YourName/daily-news-bot"
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN") 
+REPO_NAME = os.environ.get("GITHUB_REPOSITORY") 
 
 genai.configure(api_key=API_KEY)
 
@@ -26,7 +26,7 @@ def create_github_issue(title, body):
     data = {"title": title, "body": body}
     response = requests.post(url, json=data, headers=headers)
     if response.status_code == 201:
-        print("✅ Draft saved to Issues tab!")
+        print("✅ SUCCESS: Draft saved to Issues tab!")
     else:
         print(f"❌ Error creating issue: {response.text}")
 
@@ -40,12 +40,11 @@ def run_bot():
                 article = news_data.entries[0]
                 summary_text = getattr(article, 'summary', '')[:500]
                 
-                # Check duplication (Optional optimization logic could go here)
-                
                 print(f"✅ Found: {article.title}")
+                print("🧠 Writing natural post...")
                 
                 model = genai.GenerativeModel('gemini-2.0-flash')
-                system_instruction = "You are a Salesforce Admin posting on LinkedIn. Keep it under 150 words. Be conversational. No lists."
+                system_instruction = "You are a Salesforce Admin posting on LinkedIn. Keep it under 150 words. Be conversational. NO lists."
                 prompt = f"Write a LinkedIn post about: {article.title}. Summary: {summary_text}. Link: {article.link}"
                 
                 response = model.generate_content(system_instruction + prompt)

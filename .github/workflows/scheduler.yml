@@ -21,4 +21,4 @@ jobs:
       - env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # <--- GitHub provides this automatically
-        run: python daily_digest.py
+        run: python run_bot.py
