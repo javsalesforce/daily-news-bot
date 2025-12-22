@@ -1,49 +1,38 @@
 import feedparser
 import google.generativeai as genai
-import datetime
 import os
+import requests # <--- New tool to talk to GitHub
 
-# 1. SETUP: Connect to the AI Brain securely
-# This looks for the key in GitHub Secrets instead of the file
+# 1. SETUP: Keys & Tokens
 API_KEY = os.environ.get("GEMINI_API_KEY")
-
-if not API_KEY:
-    print("❌ Error: No API Key found. Make sure it's set in GitHub Secrets.")
-    exit()
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN") # <--- New Key (Built-in)
+REPO_NAME = os.environ.get("GITHUB_REPOSITORY") # <--- Gets "YourName/daily-news-bot"
 
 genai.configure(api_key=API_KEY)
 
-# 2. SETUP: The Sources
 feeds = [
     "https://admin.salesforce.com/feed",
     "https://www.salesforceben.com/feed/",
     "https://unofficialsf.com/feed/",
 ]
 
-# 3. THE "REAL HUMAN" PERSONA
-system_instruction = """
-You are a Salesforce Admin with years of experience. You are posting on LinkedIn.
-Your goal is to sound like a real person, not a corporate press release.
+# 2. FUNCTION: Create a "Ticket" (Issue) in GitHub
+def create_github_issue(title, body):
+    url = f"https://api.github.com/repos/{REPO_NAME}/issues"
+    headers = {
+        "Authorization": f"token {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+    data = {"title": title, "body": body}
+    response = requests.post(url, json=data, headers=headers)
+    if response.status_code == 201:
+        print("✅ Draft saved to Issues tab!")
+    else:
+        print(f"❌ Error creating issue: {response.text}")
 
-CRITICAL RULES:
-1. NO numbered lists. NO bullet points. NO headers.
-2. Do NOT summarize the article. Assume the reader can read the title.
-3. Instead, share a specific OPINION or REACTION. Why does this actually matter to an Admin's daily work?
-4. Use a natural, conversational tone. You can be critical or cautious.
-5. Start directly with your thought. Do not say "Here is a post."
-6. Keep it under 150 words.
-
-Structure:
-- A strong opening sentence about the topic.
-- A middle sentence adding your personal perspective or a warning.
-- End with a question to start a debate.
-- Put the link on a new line at the very bottom.
-"""
-
-# 4. THE LOGIC
-def generate_commentary():
+# 3. THE LOGIC
+def run_bot():
     print("🔍 Reading feeds...")
-    
     for url in feeds:
         try:
             news_data = feedparser.parse(url)
@@ -51,26 +40,24 @@ def generate_commentary():
                 article = news_data.entries[0]
                 summary_text = getattr(article, 'summary', '')[:500]
                 
+                # Check duplication (Optional optimization logic could go here)
+                
                 print(f"✅ Found: {article.title}")
-                print("🧠 Writing natural post...")
                 
                 model = genai.GenerativeModel('gemini-2.0-flash')
-                
-                prompt = f"""
-                Read this article summary and write a LinkedIn post about it.
-                Title: {article.title}
-                Summary: {summary_text}
-                Link: {article.link}
-                """
+                system_instruction = "You are a Salesforce Admin posting on LinkedIn. Keep it under 150 words. Be conversational. No lists."
+                prompt = f"Write a LinkedIn post about: {article.title}. Summary: {summary_text}. Link: {article.link}"
                 
                 response = model.generate_content(system_instruction + prompt)
+                draft_post = response.text
                 
-                # Clean Output
-                print("\n" + response.text + "\n")
-                return 
+                # SAVE TO ISSUES
+                issue_title = f"Draft: {article.title}"
+                create_github_issue(issue_title, draft_post)
+                return
                 
         except Exception as e:
             print(f"⚠️ Error: {e}")
 
 if __name__ == "__main__":
-    generate_commentary()
+    run_bot()
