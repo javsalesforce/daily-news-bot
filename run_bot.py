@@ -8,17 +8,31 @@ API_KEY = os.environ.get("GEMINI_API_KEY")
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN") 
 REPO_NAME = os.environ.get("GITHUB_REPOSITORY") 
 
-# Configure the AI model
 genai.configure(api_key=API_KEY)
 
-# List of Salesforce News Feeds
 feeds = [
     "https://admin.salesforce.com/feed",
     "https://www.salesforceben.com/feed/",
     "https://unofficialsf.com/feed/",
 ]
 
-# 2. FUNCTION: Create a "Ticket" (Issue) in GitHub
+# 2. HELPER: Get a list of "Tickets" we already created to prevent duplicates
+def get_posted_titles():
+    # We fetch the last 100 issues (both Open and Closed) to check history
+    url = f"https://api.github.com/repos/{REPO_NAME}/issues?state=all&per_page=100"
+    headers = {
+        "Authorization": f"token {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+    response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        issues = response.json()
+        return [issue['title'] for issue in issues]
+    else:
+        print("⚠️ Could not fetch history. Assuming everything is new.")
+        return []
+
+# 3. FUNCTION: Create a new "Ticket"
 def create_github_issue(title, body):
     url = f"https://api.github.com/repos/{REPO_NAME}/issues"
     headers = {
@@ -33,25 +47,35 @@ def create_github_issue(title, body):
     else:
         print(f"❌ Error creating issue: {response.text}")
 
-# 3. THE LOGIC
+# 4. THE MAIN LOGIC
 def run_bot():
-    print("🔍 Reading feeds...")
+    print("🔍 Checking history...")
+    existing_titles = get_posted_titles()
     
+    print("🔍 Reading feeds...")
     for url in feeds:
         try:
             news_data = feedparser.parse(url)
-            if news_data.entries:
-                article = news_data.entries[0]
+            
+            # Loop through ALL articles in the feed
+            for article in news_data.entries:
                 
-                # Grab the summary so the AI has context
+                potential_title = f"Draft: {article.title}"
+                
+                # CHECK: Have we seen this before?
+                if potential_title in existing_titles:
+                    print(f"✋ Skipping (Already posted): {article.title}")
+                    continue # Skip this and try the next one
+                
+                # If we get here, it is NEW!
                 summary_text = getattr(article, 'summary', '')[:1000]
                 
-                print(f"✅ Found: {article.title}")
+                print(f"✅ Found New Article: {article.title}")
                 print("🧠 Writing deep analysis...")
                 
                 model = genai.GenerativeModel('gemini-2.0-flash')
                 
-                # --- UPDATED PERSONALITY: VETERAN ARCHITECT ---
+                # --- VETERAN ARCHITECT PERSONA (FULL VERSION) ---
                 system_instruction = """
                 You are a veteran Salesforce Architect with deep technical expertise.
                 You are writing a thoughtful LinkedIn post to share high-value analysis with your network.
@@ -81,13 +105,13 @@ def run_bot():
                 Link: {article.link}
                 """
                 
-                # Generate content
                 response = model.generate_content(system_instruction + prompt)
                 draft_post = response.text
                 
-                # 4. SAVE TO ISSUES
-                issue_title = f"Draft: {article.title}"
-                create_github_issue(issue_title, draft_post)
+                # Save it
+                create_github_issue(potential_title, draft_post)
+                
+                # STOP after finding ONE new article
                 return 
                 
         except Exception as e:
