@@ -16,7 +16,7 @@ feeds = [
     "https://unofficialsf.com/feed/",
 ]
 
-# 2. HELPER: Get a list of "Tickets" we already created to prevent duplicates
+# 2. HELPER: Get a list of "Tickets" we already created
 def get_posted_titles():
     # We fetch the last 100 issues (both Open and Closed) to check history
     url = f"https://api.github.com/repos/{REPO_NAME}/issues?state=all&per_page=100"
@@ -75,7 +75,7 @@ def run_bot():
                 
                 model = genai.GenerativeModel('gemini-2.0-flash')
                 
-                # --- VETERAN ARCHITECT PERSONA (FULL VERSION) ---
+                # --- VETERAN ARCHITECT PERSONA ---
                 system_instruction = """
                 You are a veteran Salesforce Architect with deep technical expertise.
                 You are writing a thoughtful LinkedIn post to share high-value analysis with your network.
@@ -84,11 +84,11 @@ def run_bot():
                 - Do not just report the news; analyze the STRATEGIC IMPACT.
                 - Discuss the "Why" and the "So What." How does this affect technical debt, security, or user adoption?
                 - Write 2-3 substantial paragraphs. Do not be brief.
-                - It is okay to be skeptical or point out potential risks (e.g., "This looks great, but watch out for...").
+                - It is okay to be skeptical or point out potential risks.
 
                 TONE:
                 - Professional, authoritative, and nuanced.
-                - Use "I" statements ("I believe...", "In my experience...").
+                - Use "I" statements.
                 - No "sales fluff" or exclamation points.
 
                 STRUCTURE:
