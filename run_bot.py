@@ -16,9 +16,8 @@ feeds = [
     "https://unofficialsf.com/feed/",
 ]
 
-# 2. HELPER: Get a list of "Tickets" we already created
+# 2. HELPER: Memory - Check if we already posted this
 def get_posted_titles():
-    # We fetch the last 100 issues (both Open and Closed) to check history
     url = f"https://api.github.com/repos/{REPO_NAME}/issues?state=all&per_page=100"
     headers = {
         "Authorization": f"token {GITHUB_TOKEN}",
@@ -57,25 +56,22 @@ def run_bot():
         try:
             news_data = feedparser.parse(url)
             
-            # Loop through ALL articles in the feed
             for article in news_data.entries:
-                
                 potential_title = f"Draft: {article.title}"
                 
                 # CHECK: Have we seen this before?
                 if potential_title in existing_titles:
                     print(f"✋ Skipping (Already posted): {article.title}")
-                    continue # Skip this and try the next one
+                    continue 
                 
                 # If we get here, it is NEW!
                 summary_text = getattr(article, 'summary', '')[:1000]
-                
                 print(f"✅ Found New Article: {article.title}")
                 print("🧠 Writing deep analysis...")
                 
                 model = genai.GenerativeModel('gemini-2.0-flash')
                 
-                # --- VETERAN ARCHITECT PERSONA ---
+                # --- VETERAN ARCHITECT PERSONA (FULL DETAILED VERSION) ---
                 system_instruction = """
                 You are a veteran Salesforce Architect with deep technical expertise.
                 You are writing a thoughtful LinkedIn post to share high-value analysis with your network.
@@ -84,11 +80,11 @@ def run_bot():
                 - Do not just report the news; analyze the STRATEGIC IMPACT.
                 - Discuss the "Why" and the "So What." How does this affect technical debt, security, or user adoption?
                 - Write 2-3 substantial paragraphs. Do not be brief.
-                - It is okay to be skeptical or point out potential risks.
+                - It is okay to be skeptical or point out potential risks (e.g., "This looks great, but watch out for...").
 
                 TONE:
                 - Professional, authoritative, and nuanced.
-                - Use "I" statements.
+                - Use "I" statements ("I believe...", "In my experience...").
                 - No "sales fluff" or exclamation points.
 
                 STRUCTURE:
@@ -106,10 +102,12 @@ def run_bot():
                 """
                 
                 response = model.generate_content(system_instruction + prompt)
-                draft_post = response.text
                 
-                # Save it
-                create_github_issue(potential_title, draft_post)
+                # --- LINK ADDITION ---
+                # We append the link manually to ensure it is always there.
+                final_post = f"{response.text}\n\nRead the full article here: {article.link}"
+                
+                create_github_issue(potential_title, final_post)
                 
                 # STOP after finding ONE new article
                 return 
